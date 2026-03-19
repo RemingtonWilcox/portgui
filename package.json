@@ -1,0 +1,27 @@
+{
+  "name": "portgui",
+  "version": "0.1.0",
+  "description": "Lightweight macOS desktop app for monitoring and managing dev processes.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "app:refresh": "bash ./scripts/refresh-app.sh"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "solid-js": "^1.9.3",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "typescript": "~5.6.2",
+    "tailwindcss": "^4.1.13",
+    "vite": "^6.0.3",
+    "vite-plugin-solid": "^2.11.0",
+    "@tauri-apps/cli": "^2"
+  }
+}

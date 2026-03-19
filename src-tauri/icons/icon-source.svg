@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Dark background -->
+  <rect width="512" height="512" rx="112" fill="#0c0b0a"/>
+  <!-- Clean P — single compound path, solid color, no overlaps -->
+  <path
+    d="M128 72a8 8 0 0 1 8-8h136c80 0 144 53.8 144 120s-64 120-144 120H208v136a8 8 0 0 1-8 8h-64a8 8 0 0 1-8-8ZM208 128v112h64c44.2 0 80-25.1 80-56s-35.8-56-80-56Z"
+    fill="#2dd4bf"
+    fill-rule="evenodd"
+  />
+</svg>

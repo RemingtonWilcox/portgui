@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Clean P as a single compound path, no overlaps, no gradient -->
+  <path
+    d="M8 4.5A.5.5 0 0 1 8.5 4H17c5 0 9 3.36 9 7.5S22 19 17 19h-4v8.5a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5ZM13 8v7h4c2.76 0 5-1.57 5-3.5S19.76 8 17 8Z"
+    fill="currentColor"
+    fill-rule="evenodd"
+  />
+</svg>
