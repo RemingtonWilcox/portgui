@@ -22,7 +22,6 @@ pub fn run() {
             // Apply macOS vibrancy (frosted glass) for premium native feel
             #[cfg(target_os = "macos")]
             {
-                use tauri::WebviewWindow;
                 if let Some(window) = app.get_webview_window("main") {
                     use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
                     let _ = apply_vibrancy(&window, NSVisualEffectMaterial::UnderWindowBackground, None, None);

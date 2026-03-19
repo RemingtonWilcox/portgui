@@ -1,6 +1,6 @@
 # PortGUI
 
-A lightweight (3 MB) macOS desktop app for monitoring and managing dev processes, ports, and servers in real time.
+A small macOS desktop app for monitoring and managing dev processes, ports, and servers in real time.
 
 Built with Tauri 2, SolidJS, Tailwind CSS v4, and Rust.
 
@@ -9,12 +9,12 @@ Built with Tauri 2, SolidJS, Tailwind CSS v4, and Rust.
 **Homebrew:**
 
 ```bash
-brew install RemingtonWilcox/tap/portgui
+brew install --cask RemingtonWilcox/tap/portgui
 ```
 
 **Direct download:** grab the `.dmg` from [GitHub Releases](https://github.com/RemingtonWilcox/portgui/releases/latest).
 
-Signed and notarized by Apple — opens without Gatekeeper warnings.
+The published app is signed and notarized by Apple, so it opens without the usual Gatekeeper warning.
 
 ## What it does
 
