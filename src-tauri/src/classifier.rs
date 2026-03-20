@@ -1,4 +1,5 @@
 use crate::display_name::ProjectMetadata;
+use std::path::Path;
 
 const SPECIAL_PORTS: &[u16] = &[1234, 4321, 5432, 6379, 8787];
 
@@ -6,6 +7,7 @@ const SPECIAL_PORTS: &[u16] = &[1234, 4321, 5432, 6379, 8787];
 const DEV_TOOL_NAMES: &[&str] = &[
     "wrangler", "next", "vite", "playwright", "webpack", "esbuild",
     "astro", "nuxt", "remix", "gatsby", "hugo", "uvicorn", "flask",
+    "http.server",
 ];
 
 /// Generic runtimes that could be dev servers OR desktop apps (Electron, etc.).
@@ -23,7 +25,7 @@ const KNOWN_DESKTOP_APPS: &[&str] = &[
     "discord", "slack", "spotify", "teams", "notion", "figma",
     "1password", "bitwarden", "signal", "telegram", "whatsapp",
     "obsidian", "linear", "loom", "postman", "insomnia",
-    "cursor", "zed",
+    "cursor", "zed", "chrome", "brave", "arc", "firefox", "safari",
 ];
 
 pub fn is_dev_related(
@@ -43,10 +45,20 @@ pub fn is_dev_related(
 
     let name_lower = process_name.to_lowercase();
     let cmd_lower: Vec<String> = cmd.iter().map(|s| s.to_lowercase()).collect();
+    let executable_name = cmd
+        .first()
+        .map(|segment| {
+            Path::new(segment)
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or(segment)
+                .to_lowercase()
+        })
+        .unwrap_or_default();
 
     // Early reject: known desktop apps (Discord, Slack, etc.)
     let is_known_desktop = KNOWN_DESKTOP_APPS.iter().any(|app| {
-        name_lower.contains(app) || cmd_lower.iter().any(|s| s.contains(app))
+        name_lower.contains(app) || executable_name.contains(app)
     });
     if is_known_desktop {
         return false;
@@ -178,6 +190,55 @@ mod tests {
             &[6463],
             &["/Applications/Discord.app/Contents/Frameworks/Discord Helper (Renderer).app".into()],
             &ProjectMetadata::default(),
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn python_http_server_shows_without_project_signal() {
+        assert!(is_dev_related(
+            "Python",
+            &[4179],
+            &[
+                "python".into(),
+                "-m".into(),
+                "http.server".into(),
+                "4179".into(),
+            ],
+            &ProjectMetadata::default(),
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn chrome_is_rejected_even_in_project_dir() {
+        let metadata = ProjectMetadata {
+            has_project_markers: true,
+            ..ProjectMetadata::default()
+        };
+        assert!(!is_dev_related(
+            "Google Chrome",
+            &[55199],
+            &["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome".into()],
+            &metadata,
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn project_path_named_like_desktop_app_does_not_hide_runtime() {
+        let metadata = ProjectMetadata {
+            has_project_markers: true,
+            ..ProjectMetadata::default()
+        };
+        assert!(is_dev_related(
+            "node",
+            &[3000],
+            &["/Users/me/projects/linear-admin/server.js".into()],
+            &metadata,
             false,
             false
         ));

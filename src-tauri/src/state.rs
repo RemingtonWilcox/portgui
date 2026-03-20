@@ -1,4 +1,4 @@
-use crate::models::{Config, HistoryFile, HydratePayload, ServiceEntry};
+use crate::models::{Config, HistoryFile, ServiceEntry};
 use crate::persistence::{prune_history, Store};
 use std::sync::{Arc, Mutex};
 
@@ -31,14 +31,5 @@ impl AppState {
                 active: Vec::new(),
             })),
         })
-    }
-
-    pub fn hydrate_payload(&self) -> HydratePayload {
-        let inner = self.inner.lock().expect("app state poisoned");
-        HydratePayload {
-            active: inner.active.clone(),
-            history: inner.history.stopped.clone(),
-            config: inner.config.clone(),
-        }
     }
 }

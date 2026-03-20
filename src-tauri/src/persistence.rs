@@ -1,4 +1,4 @@
-use crate::models::{Config, HistoryFile, StoppedEntry};
+use crate::models::{make_favorite_id, Config, HistoryFile, PinnedConfig, StoppedEntry};
 use chrono::{DateTime, Duration, Utc};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,10 +19,13 @@ impl Store {
     }
 
     pub fn load_config(&self) -> Config {
-        fs::read_to_string(&self.config_path)
+        let mut config: Config = fs::read_to_string(&self.config_path)
             .ok()
             .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        config.pinned = migrate_pinned_keys(config.pinned);
+        migrate_custom_names(&mut config);
+        config
     }
 
     pub fn save_config(&self, config: &Config) -> Result<(), String> {
@@ -40,6 +43,61 @@ impl Store {
 
     pub fn save_history(&self, history: &HistoryFile) -> Result<(), String> {
         atomic_write(&self.history_path, history)
+    }
+}
+
+fn migrate_pinned_keys(
+    pinned: std::collections::HashMap<String, PinnedConfig>,
+) -> std::collections::HashMap<String, PinnedConfig> {
+    let mut migrated = std::collections::HashMap::new();
+
+    for (key, value) in pinned {
+        let next_key = legacy_service_id_to_favorite_id(&key).unwrap_or(key);
+        migrated
+            .entry(next_key)
+            .and_modify(|existing: &mut PinnedConfig| {
+                if existing.restart_cmd.is_none() {
+                    existing.restart_cmd = value.restart_cmd.clone();
+                }
+                if existing.custom_name.is_none() {
+                    existing.custom_name = value.custom_name.clone();
+                }
+                if existing.display_name.is_none() {
+                    existing.display_name = value.display_name.clone();
+                }
+                if existing.process_name.is_none() {
+                    existing.process_name = value.process_name.clone();
+                }
+                if existing.cwd.is_none() {
+                    existing.cwd = value.cwd.clone();
+                }
+                if existing.primary_port.is_none() {
+                    existing.primary_port = value.primary_port;
+                }
+            })
+            .or_insert(value);
+    }
+
+    migrated
+}
+
+fn legacy_service_id_to_favorite_id(service_id: &str) -> Option<String> {
+    let (process_name, rest) = service_id.split_once(':')?;
+    let (_, cwd) = rest.split_once(':')?;
+    Some(make_favorite_id(
+        process_name,
+        (cwd != "unknown").then_some(cwd),
+    ))
+}
+
+fn migrate_custom_names(config: &mut Config) {
+    for (favorite_id, pinned) in config.pinned.iter_mut() {
+        if let Some(custom_name) = pinned.custom_name.take() {
+            config
+                .custom_names
+                .entry(favorite_id.clone())
+                .or_insert(custom_name);
+        }
     }
 }
 

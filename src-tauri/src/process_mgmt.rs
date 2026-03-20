@@ -5,6 +5,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+const STARTUP_CHECK_TIMEOUT_MS: u64 = 750;
+
 pub fn kill_process(state: &AppState, pid: u32, start_time: u64) -> Result<(), String> {
     resolve_active_service(state, pid, start_time)?;
     signal_with_timeout(pid)
@@ -21,13 +23,35 @@ pub fn restart_process(state: &AppState, pid: u32, start_time: u64) -> Result<()
         inner
             .config
             .pinned
-            .get(&entry.service_id)
+            .get(&entry.favorite_id)
             .and_then(|config| config.restart_cmd.clone())
             .ok_or_else(|| "no restart command configured".to_string())?
     };
 
     signal_with_timeout(pid)?;
     spawn_command(&restart_cmd, cwd)
+}
+
+pub fn launch_pinned_service(state: &AppState, favorite_id: &str) -> Result<(), String> {
+    let (restart_cmd, cwd) = {
+        let inner = state.inner.lock().expect("app state poisoned");
+        let entry = inner
+            .config
+            .pinned
+            .get(favorite_id)
+            .ok_or_else(|| "favorite not found".to_string())?;
+        let restart_cmd = entry
+            .restart_cmd
+            .clone()
+            .ok_or_else(|| "favorite has no restart command".to_string())?;
+        let cwd = entry
+            .cwd
+            .clone()
+            .ok_or_else(|| "favorite has no working directory".to_string())?;
+        (restart_cmd, cwd)
+    };
+
+    spawn_command(&restart_cmd, &cwd)
 }
 
 pub fn reboot_service(state: &AppState, history_entry_id: &str) -> Result<(), String> {
@@ -116,7 +140,7 @@ fn spawn_command(command: &str, cwd: &str) -> Result<(), String> {
         let _ = sender.send(child.wait_with_output());
     });
 
-    match receiver.recv_timeout(Duration::from_secs(5)) {
+    match receiver.recv_timeout(Duration::from_millis(STARTUP_CHECK_TIMEOUT_MS)) {
         Ok(Ok(output)) => {
             if output.status.success() {
                 Ok(())

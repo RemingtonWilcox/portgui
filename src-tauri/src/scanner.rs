@@ -1,9 +1,11 @@
 use crate::classifier::is_dev_related;
 use crate::display_name::{derive_display_name, inspect_project, ProjectMetadata};
 use crate::models::{
-    make_service_id, runtime_key, Config, ProcessUpdate, ServiceEntry, ServiceStatus, StoppedEntry,
+    make_favorite_id, make_service_id, runtime_key, Config, ProcessUpdate, ServiceEntry,
+    ServiceStatus, StoppedEntry,
 };
 use crate::persistence::{next_history_id, prune_history};
+use crate::restart_cmd::infer_restart_command;
 use crate::state::AppState;
 use chrono::{TimeZone, Utc};
 use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState};
@@ -103,11 +105,12 @@ fn scan_services(
             .map(|segment| segment.to_string_lossy().to_string())
             .collect();
         let cwd = process.cwd().map(|path| path.to_string_lossy().to_string());
+        let favorite_id = make_favorite_id(&process_name, cwd.as_deref());
         let service_id = make_service_id(&process_name, primary_port, cwd.as_deref());
-        let is_pinned = config.pinned.contains_key(&service_id);
+        let is_pinned = config.pinned.contains_key(&favorite_id);
         let has_restart_cmd = config
             .pinned
-            .get(&service_id)
+            .get(&favorite_id)
             .and_then(|pinned| pinned.restart_cmd.as_ref())
             .is_some();
         let is_hidden = config.hidden.iter().any(|hidden| hidden == &service_id);
@@ -121,11 +124,27 @@ fn scan_services(
             })
             .unwrap_or_default();
 
-        if !is_dev_related(&process_name, &ports, &cmd, &project, is_pinned, is_hidden) {
+        if is_hidden {
             continue;
         }
 
-        let display_name = derive_display_name(&cmd, &project, &process_name, primary_port);
+        let is_classified = is_dev_related(&process_name, &ports, &cmd, &project, false, false);
+        let derived_display_name = if is_classified || is_pinned {
+            derive_display_name(&cmd, &project, &process_name, cwd.as_deref(), primary_port)
+        } else {
+            derive_display_name(
+                &cmd,
+                &ProjectMetadata::default(),
+                &process_name,
+                cwd.as_deref(),
+                primary_port,
+            )
+        };
+        let display_name = config
+            .custom_names
+            .get(&favorite_id)
+            .cloned()
+            .unwrap_or_else(|| derived_display_name.clone());
         let status = if cwd.is_some() || !cmd.is_empty() {
             ServiceStatus::Healthy
         } else {
@@ -136,13 +155,16 @@ fn scan_services(
             pid,
             start_time: process.start_time(),
             service_id,
+            favorite_id,
             display_name,
+            auto_display_name: derived_display_name,
             ports,
             process_name,
             cmd,
             cwd,
             uptime_secs: process.run_time(),
             status,
+            is_classified,
             is_pinned,
             has_restart_cmd,
             warning_reason: None,
@@ -153,6 +175,7 @@ fn scan_services(
         right
             .is_pinned
             .cmp(&left.is_pinned)
+            .then_with(|| right.is_classified.cmp(&left.is_classified))
             .then_with(|| left.ports.first().cmp(&right.ports.first()))
             .then_with(|| left.display_name.cmp(&right.display_name))
     });
@@ -170,11 +193,29 @@ fn apply_scan_results(
     let changed = active_entries_changed(&previous, &active);
     let active_keys: HashSet<(u32, u64)> = active.iter().map(runtime_key).collect();
     let mut newly_stopped = Vec::new();
+    let mut config_changed = false;
+
+    for entry in &active {
+        if let Some(pinned) = inner.config.pinned.get_mut(&entry.favorite_id) {
+            if pinned.restart_cmd.is_none() {
+                pinned.restart_cmd = Some(infer_restart_command(entry));
+                config_changed = true;
+            }
+            pinned.display_name = Some(entry.auto_display_name.clone());
+            pinned.process_name = Some(entry.process_name.clone());
+            pinned.cwd = entry.cwd.clone();
+            pinned.primary_port = entry.ports.first().copied();
+        }
+    }
 
     for entry in previous
         .iter()
         .filter(|entry| !active_keys.contains(&runtime_key(entry)))
     {
+        if !should_track_history(entry) {
+            continue;
+        }
+
         let started_at = Utc
             .timestamp_opt(entry.start_time as i64, 0)
             .single()
@@ -190,7 +231,7 @@ fn apply_scan_results(
             restart_cmd: inner
                 .config
                 .pinned
-                .get(&entry.service_id)
+                .get(&entry.favorite_id)
                 .and_then(|config| config.restart_cmd.clone()),
             started_at,
             stopped_at: Utc::now().to_rfc3339(),
@@ -202,6 +243,10 @@ fn apply_scan_results(
     if !newly_stopped.is_empty() {
         prune_history(&mut inner.history);
         state.store.save_history(&inner.history)?;
+    }
+
+    if config_changed {
+        state.store.save_config(&inner.config)?;
     }
 
     inner.active = active.clone();
@@ -237,15 +282,21 @@ fn same_service_for_emit(left: &ServiceEntry, right: &ServiceEntry) -> bool {
     left.pid == right.pid
         && left.start_time == right.start_time
         && left.service_id == right.service_id
+        && left.favorite_id == right.favorite_id
         && left.display_name == right.display_name
         && left.ports == right.ports
         && left.process_name == right.process_name
         && left.cmd == right.cmd
         && left.cwd == right.cwd
         && left.status == right.status
+        && left.is_classified == right.is_classified
         && left.is_pinned == right.is_pinned
         && left.has_restart_cmd == right.has_restart_cmd
         && left.warning_reason == right.warning_reason
+}
+
+fn should_track_history(entry: &ServiceEntry) -> bool {
+    entry.is_classified || entry.is_pinned
 }
 
 #[cfg(test)]
@@ -257,13 +308,16 @@ mod tests {
             pid: 123,
             start_time: 456,
             service_id: "node:3000:/tmp/demo".into(),
+            favorite_id: "node:/tmp/demo".into(),
             display_name: "Demo".into(),
+            auto_display_name: "Demo".into(),
             ports: vec![3000],
             process_name: "node".into(),
             cmd: vec!["node".into(), "vite".into()],
             cwd: Some("/tmp/demo".into()),
             uptime_secs: 10,
             status: ServiceStatus::Healthy,
+            is_classified: true,
             is_pinned: false,
             has_restart_cmd: false,
             warning_reason: None,

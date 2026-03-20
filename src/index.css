@@ -16,6 +16,9 @@
   --color-amber-bg: #fffbeb;
   --color-amber-border: #fcd34d;
   --color-amber-shadow: rgba(217, 119, 6, 0.22);
+  --color-blue: #2563eb;
+  --color-blue-bg: #eff6ff;
+  --color-blue-border: #93c5fd;
   --color-red: #dc2626;
   --color-red-bg: rgba(254, 226, 226, 0.88);
   --color-red-border: #fca5a5;
@@ -43,6 +46,9 @@
   --color-amber-bg: #261d08;
   --color-amber-border: #714f12;
   --color-amber-shadow: rgba(251, 191, 36, 0.28);
+  --color-blue: #60a5fa;
+  --color-blue-bg: #0c1a2e;
+  --color-blue-border: #1e3a5f;
   --color-red: #fca5a5;
   --color-red-bg: rgba(69, 10, 10, 0.92);
   --color-red-border: #7f1d1d;
@@ -155,6 +161,65 @@ input {
 .dropdown-animate {
   animation: dropdown-enter 120ms ease-out both;
   transform-origin: top right;
+}
+
+/* Toast slide-in */
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-animate {
+  animation: toast-enter 200ms ease-out both;
+}
+
+/* Section expand */
+@keyframes section-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-expand {
+  animation: section-expand 150ms ease-out both;
+}
+
+/* Spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 700ms linear infinite;
+}
+
+/* Pulsing dot for busy states */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.7);
+  }
+}
+
+.dot-pulse {
+  animation: pulse-dot 1s ease-in-out infinite;
 }
 
 /* Search shortcut hint */

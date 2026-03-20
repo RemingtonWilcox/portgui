@@ -1,6 +1,6 @@
 use serde_json::Value;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Debug, Clone, Default)]
 pub struct ProjectMetadata {
@@ -33,6 +33,7 @@ const KNOWN_COMMANDS: &[(&[&str], &str)] = &[
     (&["go", "run"], "Go Run"),
     (&["flask", "run"], "Flask Dev Server"),
     (&["uvicorn"], "Uvicorn Server"),
+    (&["http.server"], "Python HTTP Server"),
     (&["rails", "server"], "Rails Server"),
     (&["hugo", "server"], "Hugo Dev Server"),
 ];
@@ -54,18 +55,13 @@ pub fn inspect_project(cwd: Option<&str>) -> ProjectMetadata {
     };
 
     let cwd_path = Path::new(cwd);
-    let mut candidates = vec![PathBuf::from(cwd)];
-    if let Some(parent) = cwd_path.parent() {
-        candidates.push(parent.to_path_buf());
-    }
-
     // Walk up to find a meaningful parent project name (for monorepo context)
     let parent_dir_name = find_root_project_name(cwd_path);
 
-    for candidate in candidates {
+    for candidate in cwd_path.ancestors().take(6) {
         let mut metadata = ProjectMetadata::default();
-        metadata.package_name = read_package_json_name(&candidate);
-        metadata.cargo_name = read_cargo_toml_name(&candidate);
+        metadata.package_name = read_package_json_name(candidate);
+        metadata.cargo_name = read_cargo_toml_name(candidate);
         metadata.has_project_markers = PROJECT_MARKERS
             .iter()
             .any(|name| candidate.join(name).exists());
@@ -106,6 +102,7 @@ pub fn derive_display_name(
     cmd: &[String],
     project: &ProjectMetadata,
     process_name: &str,
+    cwd: Option<&str>,
     primary_port: u16,
 ) -> String {
     if let Some(name) = project.package_name.as_deref() {
@@ -135,6 +132,21 @@ pub fn derive_display_name(
                 .to_lowercase()
         })
         .collect();
+
+    if matches_pattern(&cmd_lower, &["http.server"]) {
+        if let Some(name) = python_http_server_root(cmd, cwd)
+            .and_then(|path| {
+                Path::new(&path)
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .map(|value| value.to_string())
+            })
+            .map(|name| humanize_path_name(&name))
+        {
+            return name;
+        }
+        return "Python HTTP Server".to_string();
+    }
 
     for (pattern, label) in KNOWN_COMMANDS {
         if matches_pattern(&cmd_lower, pattern) {
@@ -211,6 +223,32 @@ fn titlecase(input: &str) -> String {
         .join(" ")
 }
 
+fn humanize_path_name(input: &str) -> String {
+    let replaced = input.replace(['-', '_'], " ");
+    let has_inner_caps = input.chars().skip(1).any(|ch| ch.is_uppercase());
+    if has_inner_caps {
+        replaced
+    } else {
+        titlecase(&replaced)
+    }
+}
+
+fn python_http_server_root(cmd: &[String], cwd: Option<&str>) -> Option<String> {
+    for (index, segment) in cmd.iter().enumerate() {
+        if segment == "-d" || segment == "--directory" {
+            if let Some(path) = cmd.get(index + 1) {
+                return Some(path.clone());
+            }
+        }
+
+        if let Some(path) = segment.strip_prefix("--directory=") {
+            return Some(path.to_string());
+        }
+    }
+
+    cwd.map(|path| path.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,7 +268,7 @@ mod tests {
             package_name: Some("acme-app".into()),
             ..ProjectMetadata::default()
         };
-        let name = derive_display_name(&[], &metadata, "node", 3000);
+        let name = derive_display_name(&[], &metadata, "node", None, 3000);
         assert_eq!(name, "Acme App");
     }
 
@@ -238,15 +276,57 @@ mod tests {
     fn derive_display_name_matches_known_command_pattern() {
         let metadata = ProjectMetadata::default();
         let cmd = vec!["/usr/local/bin/pnpm".into(), "next".into(), "dev".into()];
-        let name = derive_display_name(&cmd, &metadata, "node", 3000);
+        let name = derive_display_name(&cmd, &metadata, "node", None, 3000);
         assert_eq!(name, "Next.js Dev Server");
     }
 
     #[test]
     fn derive_display_name_falls_back_to_process_name() {
         let metadata = ProjectMetadata::default();
-        let name = derive_display_name(&[], &metadata, "postgres", 5432);
+        let name = derive_display_name(&[], &metadata, "postgres", None, 5432);
         assert_eq!(name, "Postgres on :5432");
+    }
+
+    #[test]
+    fn derive_display_name_matches_python_http_server() {
+        let metadata = ProjectMetadata::default();
+        let cmd = vec![
+            "python".into(),
+            "-m".into(),
+            "http.server".into(),
+            "4179".into(),
+            "-d".into(),
+            "/Users/me/3Dstuff".into(),
+        ];
+        let name = derive_display_name(&cmd, &metadata, "python", Some("/Users/me/tmp"), 4179);
+        assert_eq!(name, "3Dstuff");
+    }
+
+    #[test]
+    fn derive_display_name_matches_python_http_server_directory_equals_form() {
+        let metadata = ProjectMetadata::default();
+        let cmd = vec![
+            "python".into(),
+            "-m".into(),
+            "http.server".into(),
+            "4179".into(),
+            "--directory=/Users/me/my-static-site".into(),
+        ];
+        let name = derive_display_name(&cmd, &metadata, "python", Some("/Users/me/tmp"), 4179);
+        assert_eq!(name, "My Static Site");
+    }
+
+    #[test]
+    fn derive_display_name_matches_python_http_server_cwd_fallback() {
+        let metadata = ProjectMetadata::default();
+        let cmd = vec![
+            "python".into(),
+            "-m".into(),
+            "http.server".into(),
+            "4179".into(),
+        ];
+        let name = derive_display_name(&cmd, &metadata, "python", Some("/Users/me/3Dstuff"), 4179);
+        assert_eq!(name, "3Dstuff");
     }
 
     #[test]
@@ -258,13 +338,24 @@ mod tests {
     }
 
     #[test]
+    fn inspect_project_walks_up_multiple_ancestors() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("package.json"), r#"{"name":"deep-root"}"#).unwrap();
+        let nested = dir.path().join("apps/web/public/assets");
+        fs::create_dir_all(&nested).unwrap();
+
+        let metadata = inspect_project(nested.to_str());
+        assert_eq!(metadata.package_name.as_deref(), Some("deep-root"));
+    }
+
+    #[test]
     fn generic_package_name_qualified_with_parent() {
         let metadata = ProjectMetadata {
             package_name: Some("web".into()),
             parent_dir_name: Some("workspace-app".into()),
             ..ProjectMetadata::default()
         };
-        let name = derive_display_name(&[], &metadata, "node", 3000);
+        let name = derive_display_name(&[], &metadata, "node", None, 3000);
         assert_eq!(name, "Workspace App / Web");
     }
 
@@ -275,7 +366,7 @@ mod tests {
             parent_dir_name: None,
             ..ProjectMetadata::default()
         };
-        let name = derive_display_name(&[], &metadata, "node", 3000);
+        let name = derive_display_name(&[], &metadata, "node", None, 3000);
         assert_eq!(name, "Web");
     }
 
@@ -285,7 +376,7 @@ mod tests {
             package_name: Some("@acme/web".into()),
             ..ProjectMetadata::default()
         };
-        let name = derive_display_name(&[], &metadata, "node", 3000);
+        let name = derive_display_name(&[], &metadata, "node", None, 3000);
         assert_eq!(name, "Acme Web");
     }
 }

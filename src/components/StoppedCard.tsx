@@ -32,21 +32,21 @@ export function StoppedCard(props: {
   });
 
   return (
-    <article class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-3 opacity-65">
+    <article class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] px-3 py-3">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
-            <span class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-text-secondary)]" />
-            <h3 class="truncate text-[13px] font-medium text-[var(--color-text-secondary)]">
+            <span class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-text-muted)]" />
+            <h3 class="truncate text-[13px] font-medium text-[var(--color-text-muted)]">
               {props.entry.display_name}
             </h3>
           </div>
 
           <div class="ml-4 mt-2 flex flex-wrap gap-1">
-            <span class="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
+            <span class="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-0.5 text-[10px] text-[var(--color-text-muted)]">
               was :{props.entry.primary_port}
             </span>
-            <span class="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
+            <span class="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-0.5 text-[10px] text-[var(--color-text-muted)]">
               stopped {timeAgo(props.entry.stopped_at, now())}
             </span>
           </div>
@@ -67,7 +67,7 @@ export function StoppedCard(props: {
             onClick={() => props.onReboot(props.entry)}
             class="rounded-lg border border-[var(--color-teal-border)] bg-[var(--color-teal-bg)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-teal)] transition-colors hover:brightness-110"
           >
-            Reboot
+            Restart
           </button>
         </Show>
       </div>

@@ -13,13 +13,16 @@ pub struct ServiceEntry {
     pub pid: u32,
     pub start_time: u64,
     pub service_id: String,
+    pub favorite_id: String,
     pub display_name: String,
+    pub auto_display_name: String,
     pub ports: Vec<u16>,
     pub process_name: String,
     pub cmd: Vec<String>,
     pub cwd: Option<String>,
     pub uptime_secs: u64,
     pub status: ServiceStatus,
+    pub is_classified: bool,
     pub is_pinned: bool,
     pub has_restart_cmd: bool,
     pub warning_reason: Option<String>,
@@ -42,6 +45,11 @@ pub struct StoppedEntry {
 #[serde(default)]
 pub struct PinnedConfig {
     pub restart_cmd: Option<String>,
+    pub custom_name: Option<String>,
+    pub display_name: Option<String>,
+    pub process_name: Option<String>,
+    pub cwd: Option<String>,
+    pub primary_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -64,6 +72,7 @@ impl Default for Preferences {
 #[serde(default)]
 pub struct Config {
     pub pinned: HashMap<String, PinnedConfig>,
+    pub custom_names: HashMap<String, String>,
     pub hidden: Vec<String>,
     pub preferences: Preferences,
 }
@@ -102,6 +111,11 @@ pub fn make_service_id(process_name: &str, primary_port: u16, cwd: Option<&str>)
     format!("{process_name}:{primary_port}:{cwd_part}")
 }
 
+pub fn make_favorite_id(process_name: &str, cwd: Option<&str>) -> String {
+    let cwd_part = cwd.unwrap_or("unknown");
+    format!("{}:{cwd_part}", process_name.to_lowercase())
+}
+
 pub fn runtime_key(entry: &ServiceEntry) -> (u32, u64) {
     (entry.pid, entry.start_time)
 }
@@ -123,14 +137,26 @@ mod tests {
     }
 
     #[test]
+    fn make_favorite_id_ignores_port() {
+        let id = make_favorite_id("node", Some("/tmp/demo"));
+        assert_eq!(id, "node:/tmp/demo");
+    }
+
+    #[test]
     fn config_roundtrips() {
         let config = Config {
             pinned: HashMap::from([(
-                "node:3000:/tmp/demo".into(),
+                "node:/tmp/demo".into(),
                 PinnedConfig {
                     restart_cmd: Some("pnpm dev".into()),
+                    custom_name: Some("My Demo".into()),
+                    display_name: Some("Demo".into()),
+                    process_name: Some("node".into()),
+                    cwd: Some("/tmp/demo".into()),
+                    primary_port: Some(3000),
                 },
             )]),
+            custom_names: HashMap::from([("node:/tmp/demo".into(), "My Demo".into())]),
             hidden: vec!["mDNSResponder:5353:unknown".into()],
             preferences: Preferences::default(),
         };

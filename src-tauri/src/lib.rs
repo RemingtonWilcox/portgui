@@ -4,6 +4,7 @@ mod display_name;
 mod models;
 mod persistence;
 mod process_mgmt;
+mod restart_cmd;
 mod scanner;
 mod state;
 
@@ -39,6 +40,8 @@ pub fn run() {
             commands::kill_process,
             commands::restart_process,
             commands::reboot_service,
+            commands::launch_pinned_service,
+            commands::set_custom_name,
             commands::pin_process,
             commands::unpin_process,
             commands::hide_process,

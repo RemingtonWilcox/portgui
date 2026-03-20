@@ -4,13 +4,16 @@ export interface ServiceEntry {
   pid: number;
   start_time: number;
   service_id: string;
+  favorite_id: string;
   display_name: string;
+  auto_display_name: string;
   ports: number[];
   process_name: string;
   cmd: string[];
   cwd: string | null;
   uptime_secs: number;
   status: ServiceStatus;
+  is_classified: boolean;
   is_pinned: boolean;
   has_restart_cmd: boolean;
   warning_reason: string | null;
@@ -30,6 +33,10 @@ export interface StoppedEntry {
 
 export interface PinnedConfig {
   restart_cmd: string | null;
+  display_name: string | null;
+  process_name: string | null;
+  cwd: string | null;
+  primary_port: number | null;
 }
 
 export interface Preferences {
@@ -39,6 +46,7 @@ export interface Preferences {
 
 export interface Config {
   pinned: Record<string, PinnedConfig>;
+  custom_names: Record<string, string>;
   hidden: string[];
   preferences: Preferences;
 }
@@ -59,6 +67,7 @@ export type Theme = "system" | "light" | "dark";
 export function defaultConfig(): Config {
   return {
     pinned: {},
+    custom_names: {},
     hidden: [],
     preferences: {
       theme: "system",

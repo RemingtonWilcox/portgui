@@ -28,12 +28,20 @@ export function rebootService(historyEntryId: string) {
   return invoke("reboot_service", { historyEntryId });
 }
 
+export function launchPinnedService(favoriteId: string) {
+  return invoke("launch_pinned_service", { favoriteId });
+}
+
+export function setCustomName(favoriteId: string, name: string) {
+  return invoke("set_custom_name", { favoriteId, name });
+}
+
 export function pinProcess(pid: number, startTime: number) {
   return invoke("pin_process", { pid, startTime });
 }
 
-export function unpinProcess(serviceId: string) {
-  return invoke("unpin_process", { serviceId });
+export function unpinProcess(favoriteId: string) {
+  return invoke("unpin_process", { favoriteId });
 }
 
 export function hideProcess(pid: number, startTime: number) {
@@ -44,8 +52,8 @@ export function unhideProcess(serviceId: string) {
   return invoke("unhide_process", { serviceId });
 }
 
-export function setRestartCommand(serviceId: string, cmd: string) {
-  return invoke("set_restart_command", { serviceId, cmd });
+export function setRestartCommand(favoriteId: string, cmd: string) {
+  return invoke("set_restart_command", { favoriteId, cmd });
 }
 
 export function clearHistory() {

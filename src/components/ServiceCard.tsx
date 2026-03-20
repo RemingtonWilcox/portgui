@@ -22,6 +22,7 @@ export function ServiceCard(props: {
   onKill: (entry: ServiceEntry) => void;
   onRestart: (entry: ServiceEntry) => void;
   onConfigureRestart: (entry: ServiceEntry, restartAfterSave: boolean) => void;
+  onRename?: (entry: ServiceEntry) => void;
   onPinToggle: (entry: ServiceEntry) => void;
   onHide: (entry: ServiceEntry) => void;
   pendingAction?: "kill" | "restart";
@@ -77,12 +78,19 @@ export function ServiceCard(props: {
                   props.entry.status === "Unknown",
               }}
             />
-            <h3 class="truncate text-[13px] font-semibold text-[var(--color-text)]">
+            <h3
+              class="truncate text-[13px] font-semibold text-[var(--color-text)]"
+              classList={{
+                "cursor-text": !!props.onRename,
+              }}
+              onDblClick={() => props.onRename?.(props.entry)}
+              title={props.onRename ? "Double-click to rename" : undefined}
+            >
               {props.entry.display_name}
             </h3>
             <Show when={props.entry.is_pinned}>
               <span class="rounded-full border border-[var(--color-teal-border)] bg-[var(--color-teal-bg)] px-1.5 py-px text-[9px] font-medium text-[var(--color-teal)]">
-                pinned
+                favorite
               </span>
             </Show>
             <Show when={serviceKind()}>
@@ -113,7 +121,7 @@ export function ServiceCard(props: {
             </span>
           </div>
 
-          <Show when={props.entry.cwd}>
+          <Show when={props.entry.cwd && props.entry.cwd !== "/"}>
             <div
               class="ml-4 mt-1 truncate text-[10.5px] text-[var(--color-text-muted)]"
               title={props.entry.cwd ?? undefined}
@@ -123,16 +131,20 @@ export function ServiceCard(props: {
           </Show>
         </div>
 
-        <div class="relative flex shrink-0 items-start gap-1">
+        <div class="relative flex shrink-0 items-center gap-1">
           <button
             type="button"
             ref={menuButtonRef}
             disabled={isBusy()}
             onClick={() => props.onMenuOpenChange(!props.menuOpen)}
-            class="rounded-lg border border-[var(--color-border)] bg-[var(--color-button-neutral)] px-2 py-1 text-[10px] font-medium text-[var(--color-button-neutral-text)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-button-neutral)] px-2 py-1 text-[var(--color-button-neutral-text)] transition-colors hover:border-[var(--color-border-hover)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="More actions"
           >
-            ...
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="2" />
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="12" cy="19" r="2" />
+            </svg>
           </button>
 
           <Show when={props.menuOpen}>
@@ -164,6 +176,18 @@ export function ServiceCard(props: {
                   Restart...
                 </button>
               </Show>
+              <Show when={props.onRename}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    props.onMenuOpenChange(false);
+                    props.onRename?.(props.entry);
+                  }}
+                  class="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-[var(--color-text)] hover:bg-[var(--color-bg-card)]"
+                >
+                  Rename...
+                </button>
+              </Show>
               <button
                 type="button"
                 onClick={() => {
@@ -172,7 +196,7 @@ export function ServiceCard(props: {
                 }}
                 class="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-[var(--color-text)] hover:bg-[var(--color-bg-card)]"
               >
-                {props.entry.is_pinned ? "Unpin" : "Pin"}
+                {props.entry.is_pinned ? "Remove favorite" : "Add favorite"}
               </button>
               <button
                 type="button"
@@ -191,9 +215,14 @@ export function ServiceCard(props: {
             type="button"
             disabled={isBusy()}
             onClick={() => props.onKill(props.entry)}
-            class="rounded-lg border border-[var(--color-button-neutral-border)] bg-[var(--color-button-neutral)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-button-neutral-text)] transition-colors hover:border-[var(--color-red-border)] hover:bg-[var(--color-red-bg)] hover:text-[var(--color-red)] disabled:cursor-not-allowed disabled:opacity-60"
+            class="flex items-center gap-1 rounded-lg border border-[var(--color-button-neutral-border)] bg-[var(--color-button-neutral)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-button-neutral-text)] transition-colors hover:border-[var(--color-red-border)] hover:bg-[var(--color-red-bg)] hover:text-[var(--color-red)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {props.pendingAction === "kill" ? "Stopping..." : "Kill"}
+            <Show when={props.pendingAction === "kill"}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="spinner">
+                <path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
+            </Show>
+            {props.pendingAction === "kill" ? "Stopping" : "Stop"}
           </button>
 
           <Show when={props.entry.has_restart_cmd}>
@@ -201,9 +230,14 @@ export function ServiceCard(props: {
               type="button"
               disabled={isBusy()}
               onClick={() => props.onRestart(props.entry)}
-              class="rounded-lg border border-[var(--color-teal-border)] bg-[var(--color-teal-bg)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-teal)] transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              class="flex items-center gap-1 rounded-lg border border-[var(--color-teal-border)] bg-[var(--color-teal-bg)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-teal)] transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {props.pendingAction === "restart" ? "Restarting..." : "Restart"}
+              <Show when={props.pendingAction === "restart"}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="spinner">
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+              </Show>
+              {props.pendingAction === "restart" ? "Restarting" : "Restart"}
             </button>
           </Show>
         </div>
