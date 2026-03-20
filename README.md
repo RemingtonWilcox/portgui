@@ -12,7 +12,15 @@ Built with Tauri 2, SolidJS, Tailwind CSS v4, and Rust.
 brew install --cask RemingtonWilcox/tap/portgui
 ```
 
+Upgrade an existing install:
+
+```bash
+brew upgrade --cask RemingtonWilcox/tap/portgui
+```
+
 **Direct download:** grab the `.dmg` from [GitHub Releases](https://github.com/RemingtonWilcox/portgui/releases/latest).
+
+Published release builds are signed with Developer ID and notarized by Apple.
 
 ## What it does
 
