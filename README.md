@@ -14,8 +14,6 @@ brew install --cask RemingtonWilcox/tap/portgui
 
 **Direct download:** grab the `.dmg` from [GitHub Releases](https://github.com/RemingtonWilcox/portgui/releases/latest).
 
-The published app is signed and notarized by Apple, so it opens without the usual Gatekeeper warning.
-
 ## What it does
 
 PortGUI scans your machine every 1.5 seconds for dev-related processes listening on TCP ports. It shows them in a clean dashboard where you can:
